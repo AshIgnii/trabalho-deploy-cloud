@@ -1,0 +1,100 @@
+<header class="topbar">
+  <div class="topbar__inner">
+    <div class="topbar__heading">
+      <h1 class="topbar__title">Notas</h1>
+      <span class="topbar__count">
+        {{ notes.value().length }} {{ notes.value().length === 1 ? 'nota' : 'notas' }}
+      </span>
+    </div>
+
+    <div class="topbar__tools">
+      <label class="search">
+        <app-icon name="search" [size]="20" />
+        <input #searchInput type="search" placeholder="Pesquisar notas" aria-label="Pesquisar notas"
+          [value]="query()" (input)="query.set(searchInput.value)" />
+        @if (query()) {
+          <button type="button" class="icon-btn icon-btn--sm" (click)="query.set('')" aria-label="Limpar pesquisa">
+            <app-icon name="close" [size]="18" />
+          </button>
+        }
+      </label>
+      <button type="button" class="icon-btn icon-btn--surface" (click)="toggleLayout()"
+        [attr.aria-label]="layout() === 'grid' ? 'Ver em lista' : 'Ver em grade'"
+        [attr.title]="layout() === 'grid' ? 'Ver em lista' : 'Ver em grade'">
+        <app-icon [name]="layout() === 'grid' ? 'list' : 'grid'" />
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="content" [class.content--list]="layout() === 'list'">
+  @if (isFirstLoad()) {
+    <div class="notes">
+      @for (item of [1, 2, 3, 4, 5, 6]; track item) {
+        <div class="skeleton" [style.height.px]="90 + (item % 3) * 50"></div>
+      }
+    </div>
+  } @else if (notes.error() && notes.value().length === 0) {
+    <div class="empty">
+      <div class="empty__icon"><app-icon name="note" [size]="44" /></div>
+      <h2>Não foi possível carregar as notas</h2>
+      <p>Verifique se o backend está rodando e tente novamente.</p>
+      <button type="button" class="btn-primary" (click)="notes.reload()">Tentar novamente</button>
+    </div>
+  } @else if (notes.value().length === 0) {
+    <div class="empty">
+      <div class="empty__icon"><app-icon [name]="query() ? 'search' : 'note'" [size]="44" /></div>
+      @if (query()) {
+        <h2>Nada encontrado</h2>
+        <p>Nenhuma nota corresponde a "{{ query() }}".</p>
+      } @else {
+        <h2>Nenhuma nota ainda</h2>
+        <p>Suas ideias, listas e lembretes aparecem aqui.</p>
+        <button type="button" class="btn-primary" (click)="openNew()">
+          <app-icon name="add" [size]="18" />
+          Criar primeira nota
+        </button>
+      }
+    </div>
+  } @else {
+    @if (pinnedNotes().length) {
+      <h2 class="section-label">Fixadas</h2>
+      <div class="notes">
+        @for (note of pinnedNotes(); track note.id) {
+          <app-note-card [note]="note" (opened)="open(note)" (pinToggled)="togglePin(note)" (removed)="remove(note)" />
+        }
+      </div>
+    }
+    @if (otherNotes().length) {
+      @if (pinnedNotes().length) {
+        <h2 class="section-label">Outras</h2>
+      }
+      <div class="notes">
+        @for (note of otherNotes(); track note.id) {
+          <app-note-card [note]="note" (opened)="open(note)" (pinToggled)="togglePin(note)" (removed)="remove(note)" />
+        }
+      </div>
+    }
+  }
+</main>
+
+<button type="button" class="fab" (click)="openNew()" aria-label="Nova nota">
+  <app-icon name="add" [size]="26" />
+  <span class="fab__label">Nova nota</span>
+</button>
+
+@if (toast(); as currentToast) {
+  <div class="toast" role="status">
+    <span>{{ currentToast.message }}</span>
+    @if (currentToast.undo) {
+      <button type="button" class="toast__action" (click)="runUndo(currentToast)">Desfazer</button>
+    }
+    <button type="button" class="icon-btn icon-btn--sm toast__close" (click)="dismissToast()" aria-label="Fechar aviso">
+      <app-icon name="close" [size]="16" />
+    </button>
+  </div>
+}
+
+@if (editorOpen()) {
+  <app-note-editor [note]="editingNote()" (saved)="save($event)" (removed)="removeFromEditor()" (closed)="closeEditor()" />
+}

@@ -1,0 +1,35 @@
+<article class="card note-surface" [attr.data-color]="note().color">
+  <button type="button" class="card__body" (click)="opened.emit()" [attr.aria-label]="'Abrir nota ' + (note().title || 'sem título')">
+    @if (note().title) {
+      <h3 class="card__title">{{ note().title }}</h3>
+    }
+    @if (note().content) {
+      <p class="card__content">{{ note().content }}</p>
+    }
+    @if (!note().title && !note().content) {
+      <p class="card__content card__content--empty">Nota vazia</p>
+    }
+  </button>
+
+  <footer class="card__footer">
+    <span class="card__meta">
+      <span class="card__date">{{ date() }}</span>
+      @if (note().attachments.length) {
+        <span class="card__files" [attr.title]="note().attachments.length + ' anexo(s)'">
+          <app-icon name="attach" [size]="14" />
+          {{ note().attachments.length }}
+        </span>
+      }
+    </span>
+    <div class="card__actions">
+      <button type="button" class="icon-btn icon-btn--sm" [class.is-active]="note().pinned"
+        (click)="pinToggled.emit()" [attr.aria-label]="note().pinned ? 'Desafixar' : 'Fixar'"
+        [attr.title]="note().pinned ? 'Desafixar' : 'Fixar'">
+        <app-icon name="pin" [size]="18" />
+      </button>
+      <button type="button" class="icon-btn icon-btn--sm" (click)="removed.emit()" aria-label="Excluir" title="Excluir">
+        <app-icon name="delete" [size]="18" />
+      </button>
+    </div>
+  </footer>
+</article>

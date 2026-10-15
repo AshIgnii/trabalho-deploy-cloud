@@ -1,0 +1,107 @@
+<dialog #dialog class="editor note-surface" [attr.data-color]="color()" aria-label="Editor de nota"
+  (cancel)="onCancel($event)" (click)="onDialogClick($event)"
+  (keydown.control.enter)="close()" (keydown.meta.enter)="close()"
+  (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+  <div class="editor__inner">
+    <header class="editor__toolbar">
+      <button type="button" class="icon-btn" (click)="close()" aria-label="Salvar e voltar" title="Salvar e voltar">
+        <app-icon name="back" />
+      </button>
+      <span class="editor__spacer"></span>
+      <button type="button" class="icon-btn" [class.is-active]="pinned()" (click)="pinned.set(!pinned())"
+        [attr.aria-pressed]="pinned()" [attr.aria-label]="pinned() ? 'Desafixar' : 'Fixar'"
+        [attr.title]="pinned() ? 'Desafixar' : 'Fixar'">
+        <app-icon name="pin" />
+      </button>
+      <button type="button" class="icon-btn" (click)="fileInput.click()" aria-label="Anexar arquivo" title="Anexar arquivo">
+        <app-icon name="attach" />
+      </button>
+      <input #fileInput type="file" multiple hidden (change)="onFilesSelected(fileInput)" />
+      <button type="button" class="icon-btn" [class.is-active]="showColors()" (click)="showColors.set(!showColors())"
+        [attr.aria-expanded]="showColors()" aria-label="Cor da nota" title="Cor da nota">
+        <app-icon name="palette" />
+      </button>
+      @if (note()) {
+        <button type="button" class="icon-btn" (click)="removed.emit()" aria-label="Excluir nota" title="Excluir nota">
+          <app-icon name="delete" />
+        </button>
+      }
+    </header>
+
+    @if (showColors()) {
+      <div class="editor__colors" role="radiogroup" aria-label="Cor da nota">
+        @for (option of colors; track option.value) {
+          <button type="button" role="radio" class="swatch note-surface" [attr.data-color]="option.value"
+            [attr.aria-checked]="color() === option.value" [attr.aria-label]="option.label" [attr.title]="option.label"
+            (click)="color.set(option.value)">
+            @if (color() === option.value) {
+              <app-icon name="check" [size]="18" />
+            }
+          </button>
+        }
+      </div>
+    }
+
+    <div class="editor__body">
+      <input #titleInput class="editor__title" type="text" placeholder="Título" maxlength="200"
+        [value]="title()" (input)="title.set(titleInput.value)" />
+      <textarea #contentInput class="editor__content" placeholder="Escreva algo..." maxlength="20000"
+        [value]="content()" (input)="content.set(contentInput.value)"></textarea>
+
+      @if (hasAttachments() || fileError()) {
+        <section class="files" aria-label="Anexos">
+          @if (fileError()) {
+            <p class="files__error" role="alert">{{ fileError() }}</p>
+          }
+          <ul class="files__list">
+            @for (attachment of attachments(); track attachment.id) {
+              <li class="file">
+                <span class="file__icon"><app-icon [name]="isImage(attachment.contentType) ? 'image' : 'file'" [size]="20" /></span>
+                <span class="file__info">
+                  <span class="file__name" [title]="attachment.fileName">{{ attachment.fileName }}</span>
+                  <span class="file__meta">{{ formatFileSize(attachment.size) }}</span>
+                </span>
+                <a class="icon-btn icon-btn--sm" [href]="downloadUrl(attachment)" [attr.download]="attachment.fileName"
+                  aria-label="Baixar arquivo" title="Baixar">
+                  <app-icon name="download" [size]="18" />
+                </a>
+                <button type="button" class="icon-btn icon-btn--sm" (click)="removeAttachment(attachment)"
+                  aria-label="Remover anexo" title="Remover">
+                  <app-icon name="close" [size]="18" />
+                </button>
+              </li>
+            }
+            @for (file of pendingFiles(); track $index) {
+              <li class="file file--pending">
+                <span class="file__icon"><app-icon [name]="isImage(file.type) ? 'image' : 'file'" [size]="20" /></span>
+                <span class="file__info">
+                  <span class="file__name" [title]="file.name">{{ file.name }}</span>
+                  <span class="file__meta">{{ formatFileSize(file.size) }} · envia ao salvar</span>
+                </span>
+                <button type="button" class="icon-btn icon-btn--sm" (click)="removePendingFile(file)"
+                  aria-label="Remover anexo" title="Remover">
+                  <app-icon name="close" [size]="18" />
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+
+    <footer class="editor__footer">
+      <span class="editor__date">{{ dateLabel() }}</span>
+      <button type="button" class="btn-primary" (click)="close()">
+        <app-icon name="check" [size]="18" />
+        Concluir
+      </button>
+    </footer>
+  </div>
+
+  @if (isDragging()) {
+    <div class="dropzone">
+      <app-icon name="attach" [size]="36" />
+      <span>Solte para anexar</span>
+    </div>
+  }
+</dialog>

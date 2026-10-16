@@ -1,11 +1,12 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { inject, Injectable, Signal } from '@angular/core';
+import { environment } from '../../environments/environment';
 import { Attachment, Note, NoteInput } from './note';
 
 @Injectable({ providedIn: 'root' })
 export class NotesApi {
   private readonly http = inject(HttpClient);
-  private readonly url = '/api/notes';
+  private readonly url = `${environment.apiUrl}/notes`;
 
   list(search: Signal<string>) {
     return httpResource<Note[]>(() => {
@@ -40,10 +41,10 @@ export class NotesApi {
   }
 
   deleteAttachment(id: number) {
-    return this.http.delete<void>(`/api/attachments/${id}`);
+    return this.http.delete<void>(`${environment.apiUrl}/attachments/${id}`);
   }
 
   attachmentDownloadUrl(id: number): string {
-    return `/api/attachments/${id}/download`;
+    return `${environment.apiUrl}/attachments/${id}/download`;
   }
 }

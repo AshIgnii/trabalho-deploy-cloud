@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: us-east-2
   EB_APP: notas
   EB_ENV: Notas-env
 
@@ -38,12 +38,6 @@ jobs:
           echo "web: java -Xmx512m -jar app.jar" > Procfile
           zip deploy.zip app.jar Procfile
 
-      - name: Debug OIDC
-        run: |
-          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
-          python3 -c "import sys,base64,json; p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); d=json.loads(base64.urlsafe_b64decode(p)); print(json.dumps({k:d.get(k) for k in ('iss','aud','sub')}, indent=2))" "$TOKEN"
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -65,3 +59,9 @@ jobs:
             --version-label "$VERSION"
 
           aws elasticbeanstalk wait environment-updated --environment-names "$EB_ENV"
+
+      - name: Verificar saúde
+        run: |
+          aws elasticbeanstalk describe-environments \
+            --environment-names "$EB_ENV" \
+            --query "Environments[0].[Status,Health]" --output text

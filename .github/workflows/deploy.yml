@@ -1,0 +1,57 @@
+name: Deploy para Elastic Beanstalk
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  EB_APP: notas
+  EB_ENV: Notas-env
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+          cache: maven
+
+      - name: Build
+        run: mvn -B clean package -DskipTests
+
+      - name: Empacotar
+        run: |
+          cp target/*.jar app.jar
+          echo "web: java -Xmx512m -jar app.jar" > Procfile
+          zip deploy.zip app.jar Procfile
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy
+        run: |
+          VERSION="${GITHUB_SHA::7}-${GITHUB_RUN_NUMBER}"
+          BUCKET=$(aws elasticbeanstalk create-storage-location --query S3Bucket --output text)
+          aws s3 cp deploy.zip "s3://$BUCKET/$EB_APP/$VERSION.zip"
+
+          aws elasticbeanstalk create-application-version \
+            --application-name "$EB_APP" \
+            --version-label "$VERSION" \
+            --source-bundle S3Bucket="$BUCKET",S3Key="$EB_APP/$VERSION.zip"
+
+          aws elasticbeanstalk update-environment \
+            --environment-name "$EB_ENV" \
+            --version-label "$VERSION"
+
+          aws elasticbeanstalk wait environment-updated --environment-names "$EB_ENV"

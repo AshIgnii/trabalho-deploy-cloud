@@ -1,0 +1,80 @@
+name: Ligar / Desligar aplicação
+
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: 'O que fazer'
+        required: true
+        type: choice
+        options:
+          - ligar
+          - desligar
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  EB_ENV: Notas-env
+  DB_ID: database-1
+
+jobs:
+  liga-desliga:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Descobrir Auto Scaling Group
+        run: |
+          ASG=$(aws elasticbeanstalk describe-environment-resources --environment-name "$EB_ENV" \
+            --query "EnvironmentResources.AutoScalingGroups[0].Name" --output text)
+          echo "ASG=$ASG" >> $GITHUB_ENV
+          echo "Auto Scaling Group: $ASG"
+
+      - name: Desligar
+        if: inputs.acao == 'desligar'
+        run: |
+          aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG" \
+            --min-size 0 --max-size 0 --desired-capacity 0
+          echo "Instância desligando."
+
+          STATUS=$(aws rds describe-db-instances --db-instance-identifier "$DB_ID" \
+            --query "DBInstances[0].DBInstanceStatus" --output text)
+          if [ "$STATUS" = "available" ]; then
+            aws rds stop-db-instance --db-instance-identifier "$DB_ID" >/dev/null
+            echo "Banco parando."
+          else
+            echo "Banco já estava: $STATUS"
+          fi
+
+      - name: Ligar
+        if: inputs.acao == 'ligar'
+        run: |
+          STATUS=$(aws rds describe-db-instances --db-instance-identifier "$DB_ID" \
+            --query "DBInstances[0].DBInstanceStatus" --output text)
+          if [ "$STATUS" = "stopped" ]; then
+            aws rds start-db-instance --db-instance-identifier "$DB_ID" >/dev/null
+            echo "Banco ligando..."
+          fi
+          aws rds wait db-instance-available --db-instance-identifier "$DB_ID"
+          echo "Banco disponível."
+
+          aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG" \
+            --min-size 1 --max-size 1 --desired-capacity 1
+          echo "Instância ligando..."
+
+          CNAME=$(aws elasticbeanstalk describe-environments --environment-names "$EB_ENV" \
+            --query "Environments[0].CNAME" --output text)
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://$CNAME/api/notes")
+            echo "Tentativa $i: HTTP $CODE"
+            [ "$CODE" = "200" ] && echo "Aplicação no ar: http://$CNAME" && exit 0
+            sleep 20
+          done
+          echo "A aplicação não respondeu a tempo. Confira o painel do Beanstalk."
+          exit 1
